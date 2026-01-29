@@ -247,7 +247,7 @@ const App: React.FC = () => {
       total: product.unitPrice
     };
     setItems(prev => [...prev, newItem]);
-    setItemSearchTerm('');
+    setItemSearchTerm(''); 
   };
 
   const updateItem = (id: string, updates: Partial<InvoiceItem>) => {
