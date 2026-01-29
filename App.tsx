@@ -185,7 +185,7 @@ const App: React.FC = () => {
       p.particulars.toLowerCase().includes(term)
     );
   }, [productRegistry, itemSearchTerm]);
-
+ 
   // Actions
   const loadDemoData = () => {
     setCustomer({
