@@ -2,18 +2,21 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { InvoiceItem } from "../types.ts";
 
-// Ensure process is defined for environments that don't provide it (like browsers)
-const getApiKey = () => {
-  try {
-    return (window as any).process?.env?.API_KEY || (globalThis as any).process?.env?.API_KEY || "";
-  } catch (e) {
-    return "";
-  }
-};
+// Use Vite's build-time env injection; only VITE_* keys are exposed in the browser.
+const apiKey = import.meta.env.VITE_GEMINI_API_KEY as string | undefined;
 
-const ai = new GoogleGenAI({ apiKey: getApiKey() });
+let ai: GoogleGenAI | null = null;
+if (apiKey) {
+  ai = new GoogleGenAI({ apiKey });
+} else {
+  console.warn("VITE_GEMINI_API_KEY is not set; AI item parsing is disabled.");
+}
 
 export const parseItemsWithAI = async (text: string): Promise<Partial<InvoiceItem>[]> => {
+  if (!ai) {
+    // Fail gracefully when no API key is configured.
+    return [];
+  }
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3-pro-preview',
