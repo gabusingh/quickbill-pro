@@ -1,0 +1,5 @@
+{
+  "name": "QuickBill Pro",
+  "description": "A smart, mobile-first billing application with AI-powered item parsing, automated calculations, and professional invoice generation.",
+  "requestFramePermissions": []
+}
