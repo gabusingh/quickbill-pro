@@ -2,9 +2,26 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { InvoiceItem } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Vite exposes env vars via import.meta.env and only those
+// prefixed with VITE_ are available in the client bundle.
+const apiKey = import.meta.env.VITE_GEMINI_API_KEY as string | undefined;
+
+// Lazily-initialised client so we don't throw when the key is missing.
+let ai: GoogleGenAI | null = null;
+if (apiKey) {
+  ai = new GoogleGenAI({ apiKey });
+} else {
+  // Keep the UI functional even if AI is not configured.
+  console.warn("VITE_GEMINI_API_KEY is not set; AI item parsing is disabled.");
+}
 
 export const parseItemsWithAI = async (text: string): Promise<Partial<InvoiceItem>[]> => {
+  // If there is no configured client, just return an empty result.
+  if (!ai) {
+    console.warn("Skipping AI parsing because Gemini API is not configured.");
+    return [];
+  }
+
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
