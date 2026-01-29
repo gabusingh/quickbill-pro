@@ -13,23 +13,61 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="AstroGems">
     <meta name="mobile-web-app-capable" content="yes">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      // Process shim for browser environments
+      window.process = window.process || { env: {} };
+      
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Inter', 'sans-serif'],
+              serif: ['Playfair Display', 'serif'],
+            },
+          },
+        },
+      }
+    </script>
+    
+    <script>
+      // Blocking script to prevent theme flicker
+      (function() {
+        try {
+          const theme = localStorage.getItem('astro_theme') || 'system';
+          const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          if (theme === 'dark' || (theme === 'system' && supportDarkMode)) {
+            document.documentElement.classList.add('dark');
+          } else {
+            document.documentElement.classList.remove('dark');
+          }
+        } catch (e) {}
+      })();
+    </script>
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
     <style>
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #0f172a;
+            background-color: #f8fafc;
             margin: 0;
             padding: 0;
             -webkit-tap-highlight-color: transparent;
+            transition: background-color 0.3s ease;
+        }
+
+        .dark body {
+            background-color: #0f172a;
         }
 
         h1, h2, .brand-font {
             font-family: 'Playfair Display', serif;
         }
 
-        /* Prevent scrolling bounce on iOS */
         html, body {
             overflow: hidden;
             height: 100%;
@@ -42,8 +80,15 @@
             overflow: hidden;
         }
 
-        .scrollbar-hide::-webkit-scrollbar { display: none; }
-        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        .loading-screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            background: #0f172a;
+            color: #7c3aed;
+        }
 
         @media print {
             @page { 
@@ -51,7 +96,6 @@
                 size: portrait; 
             }
             
-            /* Unlocking all containers for the print engine */
             html, body, #root, #root > div, main {
                 height: auto !important;
                 min-height: 0 !important;
@@ -65,12 +109,8 @@
                 padding: 0 !important;
             }
 
-            /* Specifically hide everything that isn't the invoice */
             .no-print, header, footer, .no-print * {
                 display: none !important;
-                height: 0 !important;
-                margin: 0 !important;
-                padding: 0 !important;
             }
 
             #invoice-bill {
@@ -84,7 +124,6 @@
                 color: black !important;
             }
 
-            /* Fix text visibility for high-contrast printing */
             * {
                 color: black !important;
                 background: transparent !important;
@@ -92,14 +131,6 @@
                 text-shadow: none !important;
                 print-color-adjust: exact;
                 -webkit-print-color-adjust: exact;
-            }
-
-            .text-violet-700, .text-violet-600 { 
-                color: #7c3aed !important; 
-            }
-
-            img {
-                max-width: 100% !important;
             }
         }
     </style>
@@ -113,10 +144,20 @@
     "@heroicons/react/": "https://esm.sh/@heroicons/react@^2.2.0/"
   }
 }
-}</script>
+</script>
+<link rel="stylesheet" href="/index.css">
 </head>
-<body>
-    <div id="root"></div>
+<body class="bg-slate-50 dark:bg-slate-900 transition-colors duration-300">
+    <div id="root">
+        <div class="loading-screen">
+            <svg class="animate-spin h-10 w-10 mb-4" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p class="brand-font text-xl font-bold tracking-widest">AstroGems Pro</p>
+        </div>
+    </div>
+    <script type="module" src="index.tsx"></script>
 <script type="module" src="/index.tsx"></script>
 </body>
 </html>

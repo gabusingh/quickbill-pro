@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { CustomerDetails, InvoiceItem, Invoice, ItemTemplate } from './types';
-import { parseItemsWithAI } from './services/geminiService';
+import { CustomerDetails, InvoiceItem, Invoice, ItemTemplate } from './types.ts';
+import { parseItemsWithAI } from './services/geminiService.ts';
 import { 
   PlusIcon, 
   TrashIcon, 
@@ -20,8 +20,12 @@ import {
   ShoppingBagIcon,
   UserIcon,
   MoonIcon,
+  SunIcon,
+  ComputerDesktopIcon,
   StarIcon
 } from '@heroicons/react/24/outline';
+
+type Theme = 'light' | 'dark' | 'system';
 
 const formatINR = (amount: number) => {
   return new Intl.NumberFormat('en-IN', {
@@ -40,7 +44,6 @@ const generateInvoiceId = () => {
   return `AG-${year}${month}${day}-${random}`;
 };
 
-// Initial registry for an Astrology Gem Store
 const DEFAULT_GEMS: ItemTemplate[] = [
   { id: 'g1', particulars: 'Blue Sapphire (Neelam)', weight: 5.25, weightUnit: 'ct', unitPrice: 12500 },
   { id: 'g2', particulars: 'Yellow Sapphire (Pukhraj)', weight: 4.5, weightUnit: 'ct', unitPrice: 15000 },
@@ -54,15 +57,13 @@ const DEFAULT_GEMS: ItemTemplate[] = [
 
 const App: React.FC = () => {
   const [step, setStep] = useState<1 | 2 | 3>(1); 
+  const [theme, setTheme] = useState<Theme>(() => (localStorage.getItem('astro_theme') as Theme) || 'system');
   const [customer, setCustomer] = useState<CustomerDetails>({
-    name: '',
-    phone: '',
-    email: '',
-    address: ''
+    name: '', phone: '', email: '', address: ''
   });
   const [items, setItems] = useState<InvoiceItem[]>([]);
   const [currentInvoiceId, setCurrentInvoiceId] = useState<string>('');
-  const [taxRate, setTaxRate] = useState<number>(3); // Standard 3% for precious gems
+  const [taxRate, setTaxRate] = useState<number>(3); 
   const [isGstEnabled, setIsGstEnabled] = useState<boolean>(true);
   const [aiInput, setAiInput] = useState('');
   const [itemSearchTerm, setItemSearchTerm] = useState('');
@@ -70,7 +71,6 @@ const App: React.FC = () => {
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [invoiceHistory, setInvoiceHistory] = useState<Invoice[]>([]);
   
-  // Local "Database" Registries
   const [customerRegistry, setCustomerRegistry] = useState<CustomerDetails[]>([]);
   const [productRegistry, setProductRegistry] = useState<ItemTemplate[]>([]);
   
@@ -82,7 +82,31 @@ const App: React.FC = () => {
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Initialization & PWA Setup
+  // Theme Logic
+  useEffect(() => {
+    const root = window.document.documentElement;
+    localStorage.setItem('astro_theme', theme);
+    
+    const applyTheme = () => {
+      const isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      if (isDark) {
+        root.classList.add('dark');
+      } else {
+        root.classList.remove('dark');
+      }
+    };
+
+    applyTheme();
+
+    if (theme === 'system') {
+      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+      const handleChange = () => applyTheme();
+      mediaQuery.addEventListener('change', handleChange);
+      return () => mediaQuery.removeEventListener('change', handleChange);
+    }
+  }, [theme]);
+
+  // Initialization & PWA
   useEffect(() => {
     const isStandalone = (window.navigator as any).standalone || window.matchMedia('(display-mode: standalone)').matches;
     setIsInstalled(isStandalone);
@@ -99,7 +123,7 @@ const App: React.FC = () => {
       if (!hasSeenTip) setShowIosInstallTip(true);
     }
 
-    // Load "Database" from LocalStorage
+    // Load History & Registry
     const savedCustomers = localStorage.getItem('astro_customer_registry');
     if (savedCustomers) setCustomerRegistry(JSON.parse(savedCustomers));
     
@@ -117,6 +141,14 @@ const App: React.FC = () => {
     return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
   }, []);
 
+  const toggleTheme = () => {
+    setTheme(prev => {
+      if (prev === 'light') return 'dark';
+      if (prev === 'dark') return 'system';
+      return 'light';
+    });
+  };
+
   const handleInstallAndroid = async () => {
     if (!deferredPrompt) return;
     deferredPrompt.prompt();
@@ -129,7 +161,6 @@ const App: React.FC = () => {
     localStorage.setItem('has_seen_ios_tip_astro', 'true');
   };
 
-  // Registry Management (Database Upserts)
   const upsertCustomerToRegistry = (cust: CustomerDetails) => {
     if (!cust.name || !cust.phone) return;
     setCustomerRegistry(prev => {
@@ -168,39 +199,19 @@ const App: React.FC = () => {
     });
   }, []);
 
-  // Search Logic
   const suggestedCustomers = useMemo(() => {
     if (customerSearchTerm.length < 2) return [];
     const term = customerSearchTerm.toLowerCase();
     return customerRegistry.filter(c => 
-      c.name.toLowerCase().includes(term) || 
-      c.phone.includes(term)
+      c.name.toLowerCase().includes(term) || c.phone.includes(term)
     );
   }, [customerRegistry, customerSearchTerm]);
 
   const suggestedProducts = useMemo(() => {
     if (itemSearchTerm.length < 2) return [];
     const term = itemSearchTerm.toLowerCase();
-    return productRegistry.filter(p => 
-      p.particulars.toLowerCase().includes(term)
-    );
+    return productRegistry.filter(p => p.particulars.toLowerCase().includes(term));
   }, [productRegistry, itemSearchTerm]);
- 
-  // Actions
-  const loadDemoData = () => {
-    setCustomer({
-      name: "Rajesh Kumar",
-      phone: "+91 98765 43210",
-      email: "rajesh@gmail.com",
-      address: "H.No 45, Sector 15, Gurgaon, HR"
-    });
-    setItems([
-      { id: '1', particulars: 'Yellow Sapphire (Certified)', quantity: 1, weight: 4.25, weightUnit: 'ct', unitPrice: 18000, total: 18000 },
-      { id: '2', particulars: 'Astrological Consultation', quantity: 1, weight: 0, weightUnit: '-', unitPrice: 1100, total: 1100 }
-    ]);
-    setCurrentInvoiceId(generateInvoiceId());
-    setStep(3);
-  };
 
   const handleNewSession = () => {
     setStep(1);
@@ -220,12 +231,7 @@ const App: React.FC = () => {
   const addItem = () => {
     const newItem: InvoiceItem = {
       id: Math.random().toString(36).substr(2, 9),
-      particulars: '',
-      quantity: 1,
-      weight: 0,
-      weightUnit: 'ct',
-      unitPrice: 0,
-      total: 0
+      particulars: '', quantity: 1, weight: 0, weightUnit: 'ct', unitPrice: 0, total: 0
     };
     setItems(prev => [...prev, newItem]);
   };
@@ -267,21 +273,12 @@ const App: React.FC = () => {
   const handleFinish = () => {
     const newId = currentInvoiceId || generateInvoiceId();
     setCurrentInvoiceId(newId);
-    
     upsertCustomerToRegistry(customer);
     upsertProductsToRegistry(items);
-
     const newInvoice: Invoice = {
-      id: newId,
-      date: new Date().toLocaleDateString(),
-      customer,
-      items,
-      subtotal: totals.subtotal,
-      taxRate,
-      taxAmount: totals.taxAmount,
-      grandTotal: totals.grandTotal,
-      isGstEnabled,
-      signature: signature || undefined
+      id: newId, date: new Date().toLocaleDateString(), customer, items,
+      subtotal: totals.subtotal, taxRate, taxAmount: totals.taxAmount,
+      grandTotal: totals.grandTotal, isGstEnabled, signature: signature || undefined
     };
     saveToHistory(newInvoice);
     setStep(3);
@@ -308,23 +305,44 @@ const App: React.FC = () => {
     }
   };
 
+  const loadDemoData = () => {
+    setCustomer({
+      name: 'Aditya Vardhan',
+      phone: '9820012345',
+      email: 'aditya.v@example.com',
+      address: '7th Floor, Crystal Tower, Marine Drive, Mumbai, Maharashtra 400020'
+    });
+    setItems([
+      {
+        id: 'demo-1',
+        particulars: 'Natural Blue Sapphire (Neelam)',
+        quantity: 1,
+        weight: 5.25,
+        weightUnit: 'ct',
+        unitPrice: 45000,
+        total: 45000
+      },
+      {
+        id: 'demo-2',
+        particulars: 'Natural Yellow Sapphire (Pukhraj)',
+        quantity: 1,
+        weight: 4.5,
+        weightUnit: 'ct',
+        unitPrice: 38000,
+        total: 38000
+      }
+    ]);
+  };
+
   const handleShare = () => {
-    const text = `✨ *AstroGems Pro Bill* ✨\n` +
-      `*Ref:* ${currentInvoiceId}\n` +
-      `*Customer:* ${customer.name}\n` +
-      `*Total:* ${formatINR(totals.grandTotal)}\n` +
-      `Thank you for visiting! ✨`;
+    const text = `✨ *AstroGems Pro Bill* ✨\n*Ref:* ${currentInvoiceId}\n*Customer:* ${customer.name}\n*Total:* ${formatINR(totals.grandTotal)}\nThank you for visiting! ✨`;
     const encoded = encodeURIComponent(text);
     const phone = customer.phone.replace(/\D/g, '');
     window.open(`https://wa.me/${phone}?text=${encoded}`, '_blank');
   };
 
   const handlePrint = () => {
-    // Small delay helps ensures layout is stable and UI thread is clear 
-    // for standard browser print triggers.
-    setTimeout(() => {
-        window.print();
-    }, 100);
+    setTimeout(() => { window.print(); }, 100);
   };
 
   const startDrawing = (e: any) => {
@@ -350,7 +368,7 @@ const App: React.FC = () => {
     if (ctx) {
       ctx.lineWidth = 2;
       ctx.lineCap = 'round';
-      ctx.strokeStyle = '#312e81';
+      ctx.strokeStyle = theme === 'light' ? '#475569' : '#a78bfa';
       ctx.lineTo(x, y);
       ctx.stroke();
     }
@@ -358,58 +376,54 @@ const App: React.FC = () => {
   const stopDrawing = () => {
     setIsDrawing(false);
     const canvas = canvasRef.current;
-    if (canvas) {
-      setSignature(canvas.toDataURL('image/png'));
-    }
+    if (canvas) setSignature(canvas.toDataURL('image/png'));
   };
 
   return (
-    <div className="h-[100dvh] bg-slate-900 flex flex-col max-w-lg mx-auto shadow-2xl overflow-hidden text-slate-100">
-      <header className="flex-none bg-slate-950 border-b border-slate-800 p-4 no-print pt-[env(safe-area-inset-top,16px)]">
+    <div className="h-[100dvh] bg-slate-50 dark:bg-slate-900 flex flex-col max-w-lg mx-auto shadow-2xl overflow-hidden text-slate-900 dark:text-slate-100 transition-colors duration-300">
+      <header className="flex-none bg-white dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 p-4 no-print pt-[env(safe-area-inset-top,16px)]">
         <div className="flex justify-between items-center mb-4">
           <div className="flex items-center">
              <div className="bg-violet-600 p-2 rounded-xl mr-3 shadow-lg shadow-violet-900/40">
                 <StarIcon className="w-5 h-5 text-white" />
              </div>
              <div>
-                <h1 className="text-xl font-bold text-white brand-font tracking-tight">AstroGems <span className="text-violet-400">Pro</span></h1>
+                <h1 className="text-xl font-bold text-slate-900 dark:text-white brand-font tracking-tight">AstroGems <span className="text-violet-600 dark:text-violet-400">Pro</span></h1>
                 <p className="text-[10px] text-slate-500 uppercase font-bold tracking-widest">Premium Billing</p>
              </div>
           </div>
           <div className="flex items-center gap-2">
-            {!isInstalled && deferredPrompt && (
-              <button onClick={handleInstallAndroid} className="bg-violet-600/20 text-violet-400 px-3 py-1.5 rounded-lg text-xs font-bold border border-violet-500/30 flex items-center">
-                <ArrowDownTrayIcon className="w-4 h-4 mr-1" /> Install
-              </button>
-            )}
-            <button onClick={() => setStep(1)} className="text-slate-400 hover:text-white transition-colors">
+            <button onClick={toggleTheme} className="p-2 text-slate-400 hover:text-violet-600 dark:hover:text-violet-400 transition-colors bg-slate-100 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
+              {theme === 'light' ? <SunIcon className="w-5 h-5" /> : theme === 'dark' ? <MoonIcon className="w-5 h-5" /> : <ComputerDesktopIcon className="w-5 h-5" />}
+            </button>
+            <button onClick={() => setStep(1)} className="p-2 text-slate-400 hover:text-violet-600 dark:hover:text-violet-400 transition-colors">
               <ClockIcon className="w-6 h-6" />
             </button>
           </div>
         </div>
 
         <div className="flex justify-between relative no-print px-4">
-          <div className="absolute top-1/2 left-0 w-full h-px bg-slate-800 -z-10 -translate-y-1/2"></div>
+          <div className="absolute top-1/2 left-0 w-full h-px bg-slate-200 dark:bg-slate-800 -z-10 -translate-y-1/2"></div>
           {[1, 2, 3].map((s) => (
-            <div key={s} className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black border-2 transition-all ${step === s ? 'bg-violet-600 border-violet-600 text-white scale-110 shadow-lg shadow-violet-900/40' : step > s ? 'bg-emerald-600 border-emerald-600 text-white' : 'bg-slate-900 border-slate-700 text-slate-600'}`}>
+            <div key={s} className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black border-2 transition-all ${step === s ? 'bg-violet-600 border-violet-600 text-white scale-110 shadow-lg shadow-violet-900/40' : step > s ? 'bg-emerald-600 border-emerald-600 text-white' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-600'}`}>
               {step > s ? <CheckCircleIcon className="w-5 h-5" /> : s}
             </div>
           ))}
         </div>
       </header>
 
-      <main className="flex-1 p-4 overflow-y-auto relative scrollbar-hide bg-slate-900">
+      <main className="flex-1 p-4 overflow-y-auto relative scrollbar-hide">
         {step === 1 && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
-            <section className="bg-slate-950/50 p-6 rounded-3xl border border-slate-800 shadow-xl relative">
-              <h2 className="text-lg font-semibold text-white mb-5 flex items-center brand-font">
-                <UserPlusIcon className="w-5 h-5 mr-3 text-violet-400" />
+            <section className="bg-white dark:bg-slate-950/50 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm dark:shadow-xl relative">
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-5 flex items-center brand-font">
+                <UserPlusIcon className="w-5 h-5 mr-3 text-violet-600 dark:text-violet-400" />
                 Customer Identity
               </h2>
               
               <div className="space-y-4">
                 <div className="relative">
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Name / Phone Search</label>
+                  <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Name / Phone Search</label>
                   <div className="relative group">
                     <input 
                       type="text" 
@@ -419,29 +433,25 @@ const App: React.FC = () => {
                         setCustomerSearchTerm(e.target.value);
                       }} 
                       placeholder="Start typing..." 
-                      className="w-full pl-10 pr-4 py-3 bg-slate-900 border border-slate-800 rounded-2xl focus:ring-2 focus:ring-violet-500 outline-none transition-all text-white placeholder-slate-600" 
+                      className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl focus:ring-2 focus:ring-violet-500 outline-none transition-all text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-600" 
                     />
-                    <MagnifyingGlassIcon className="w-5 h-5 absolute left-3.5 top-3.5 text-slate-600 group-focus-within:text-violet-400 transition-colors" />
+                    <MagnifyingGlassIcon className="w-5 h-5 absolute left-3.5 top-3.5 text-slate-400 group-focus-within:text-violet-600 transition-colors" />
                   </div>
 
                   {suggestedCustomers.length > 0 && (
-                    <div className="absolute z-20 top-full left-0 right-0 mt-2 bg-slate-800 rounded-2xl shadow-2xl border border-slate-700 overflow-hidden max-h-60 overflow-y-auto ring-1 ring-slate-700">
-                      <div className="px-3 py-2 bg-slate-900 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Registered Clients</div>
+                    <div className="absolute z-20 top-full left-0 right-0 mt-2 bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden max-h-60 overflow-y-auto">
                       {suggestedCustomers.map((c) => (
                         <button 
                           key={c.phone} 
-                          onClick={() => {
-                            setCustomer(c);
-                            setCustomerSearchTerm('');
-                          }}
-                          className="w-full flex items-center p-4 text-left hover:bg-slate-700 border-b border-slate-900/50 last:border-0 active:bg-violet-600/20"
+                          onClick={() => { setCustomer(c); setCustomerSearchTerm(''); }}
+                          className="w-full flex items-center p-4 text-left hover:bg-slate-50 dark:hover:bg-slate-700 border-b border-slate-100 dark:border-slate-900/50 last:border-0"
                         >
-                          <div className="bg-slate-900 p-2 rounded-xl mr-4 text-violet-400">
+                          <div className="bg-slate-100 dark:bg-slate-900 p-2 rounded-xl mr-4 text-violet-600 dark:text-violet-400">
                             <UserIcon className="w-5 h-5" />
                           </div>
                           <div>
-                            <p className="font-bold text-sm text-white">{c.name}</p>
-                            <p className="text-xs text-slate-400">{c.phone}</p>
+                            <p className="font-bold text-sm text-slate-900 dark:text-white">{c.name}</p>
+                            <p className="text-xs text-slate-500">{c.phone}</p>
                           </div>
                         </button>
                       ))}
@@ -451,28 +461,28 @@ const App: React.FC = () => {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Phone</label>
-                    <input type="tel" value={customer.phone} onChange={(e) => setCustomer({...customer, phone: e.target.value})} placeholder="+91..." className="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-2xl focus:ring-2 focus:ring-violet-500 outline-none text-white" />
+                    <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Phone</label>
+                    <input type="tel" value={customer.phone} onChange={(e) => setCustomer({...customer, phone: e.target.value})} placeholder="+91..." className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl focus:ring-2 focus:ring-violet-500 outline-none" />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Email</label>
-                    <input type="email" value={customer.email} onChange={(e) => setCustomer({...customer, email: e.target.value})} placeholder="Optional" className="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-2xl focus:ring-2 focus:ring-violet-500 outline-none text-white" />
+                    <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Email</label>
+                    <input type="email" value={customer.email} onChange={(e) => setCustomer({...customer, email: e.target.value})} placeholder="Optional" className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl focus:ring-2 focus:ring-violet-500 outline-none" />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Postal Address</label>
-                  <textarea rows={2} value={customer.address} onChange={(e) => setCustomer({...customer, address: e.target.value})} placeholder="Billing location..." className="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-2xl focus:ring-2 focus:ring-violet-500 outline-none resize-none text-white" />
+                  <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Postal Address</label>
+                  <textarea rows={2} value={customer.address} onChange={(e) => setCustomer({...customer, address: e.target.value})} placeholder="Billing location..." className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl focus:ring-2 focus:ring-violet-500 outline-none resize-none" />
                 </div>
               </div>
             </section>
 
-            <section className="bg-slate-950/50 p-5 rounded-3xl border border-slate-800">
+            <section className="bg-white dark:bg-slate-950/50 p-5 rounded-3xl border border-slate-200 dark:border-slate-800">
               <div className="flex items-center justify-between">
                 <div>
-                  <span className="text-sm font-semibold text-white block">Calculate GST ({taxRate}%)</span>
+                  <span className="text-sm font-semibold text-slate-900 dark:text-white block">Calculate GST ({taxRate}%)</span>
                   <p className="text-[10px] text-slate-500">Applied on precious gemstones</p>
                 </div>
-                <button onClick={() => setIsGstEnabled(!isGstEnabled)} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${isGstEnabled ? 'bg-violet-600' : 'bg-slate-700'}`}>
+                <button onClick={() => setIsGstEnabled(!isGstEnabled)} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${isGstEnabled ? 'bg-violet-600' : 'bg-slate-300 dark:bg-slate-700'}`}>
                   <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isGstEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
                 </button>
               </div>
@@ -480,89 +490,76 @@ const App: React.FC = () => {
 
             {invoiceHistory.length > 0 && (
               <section className="space-y-3">
-                <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Recent Invoices</h3>
+                <h3 className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">Recent Invoices</h3>
                 <div className="space-y-3">
                   {invoiceHistory.slice(0, 3).map((inv) => (
-                    <button key={inv.id} className="w-full bg-slate-950/50 p-4 rounded-3xl border border-slate-800 flex justify-between items-center text-left hover:border-slate-600 transition-colors" onClick={() => { setCustomer(inv.customer); setItems(inv.items); setStep(3); }}>
+                    <button key={inv.id} className="w-full bg-white dark:bg-slate-950/50 p-4 rounded-3xl border border-slate-200 dark:border-slate-800 flex justify-between items-center text-left hover:border-violet-300 dark:hover:border-slate-600 transition-colors" onClick={() => { setCustomer(inv.customer); setItems(inv.items); setStep(3); }}>
                       <div className="flex items-center">
-                        <div className="bg-slate-900 p-2 rounded-xl mr-4 text-violet-400">
+                        <div className="bg-slate-50 dark:bg-slate-900 p-2 rounded-xl mr-4 text-violet-600 dark:text-violet-400">
                           <MoonIcon className="w-5 h-5" />
                         </div>
                         <div>
-                          <p className="font-bold text-white text-sm">{inv.customer.name}</p>
+                          <p className="font-bold text-slate-900 dark:text-white text-sm">{inv.customer.name}</p>
                           <p className="text-[10px] text-slate-500">{inv.id} • {inv.date}</p>
                         </div>
                       </div>
-                      <p className="font-black text-violet-400">{formatINR(inv.grandTotal)}</p>
+                      <p className="font-black text-violet-600 dark:text-violet-400">{formatINR(inv.grandTotal)}</p>
                     </button>
                   ))}
                 </div>
               </section>
             )}
             
-            <button onClick={loadDemoData} className="w-full py-4 text-slate-600 text-[10px] font-black uppercase tracking-[0.2em] hover:text-violet-400 transition-colors">Start with Demo Record</button>
+            <button onClick={loadDemoData} className="w-full py-4 text-slate-400 dark:text-slate-600 text-[10px] font-black uppercase tracking-[0.2em] hover:text-violet-600 dark:hover:text-violet-400 transition-colors">Start with Demo Record</button>
           </div>
         )}
 
         {step === 2 && (
           <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300 pb-10">
-            <div className="bg-gradient-to-br from-violet-600 to-indigo-700 p-6 rounded-[2.5rem] shadow-2xl shadow-violet-900/30 text-white relative overflow-hidden">
+            <div className="bg-gradient-to-br from-violet-600 to-indigo-700 p-6 rounded-[2.5rem] shadow-2xl text-white relative overflow-hidden">
               <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
               <div className="flex items-center text-violet-100 mb-4 text-[10px] font-black uppercase tracking-widest">
                 <SparklesIcon className="w-4 h-4 mr-2" /> AI Celestial Parsing
               </div>
               <div className="relative">
                 <input type="text" value={aiInput} onChange={(e) => setAiInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSmartAdd()} placeholder="e.g. 5ct Blue Sapphire at 12k..." className="w-full pr-24 pl-5 py-4 bg-black/20 border border-white/10 rounded-2xl text-sm placeholder-violet-200 focus:bg-black/30 outline-none text-white transition-all backdrop-blur-sm" />
-                <button onClick={handleSmartAdd} disabled={isAiLoading || !aiInput} className="absolute right-2 top-2 bottom-2 px-5 bg-white text-violet-700 rounded-xl text-xs font-black shadow-lg shadow-black/20 active:scale-95 transition-transform">
+                <button onClick={handleSmartAdd} disabled={isAiLoading || !aiInput} className="absolute right-2 top-2 bottom-2 px-5 bg-white text-violet-700 rounded-xl text-xs font-black shadow-lg">
                   {isAiLoading ? '...' : 'ADD'}
                 </button>
               </div>
-              <p className="mt-3 text-[10px] text-violet-200/70 italic px-1">Describe items and prices naturally...</p>
             </div>
 
             <div className="space-y-4">
               <div className="flex justify-between items-center px-1">
-                <h2 className="text-lg font-semibold text-white flex items-center brand-font">
-                  <ShoppingBagIcon className="w-5 h-5 mr-3 text-violet-400" />
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center brand-font">
+                  <ShoppingBagIcon className="w-5 h-5 mr-3 text-violet-600 dark:text-violet-400" />
                   Inventory & Gems
                 </h2>
-                <button onClick={addItem} className="flex items-center text-xs font-black text-violet-400 bg-violet-400/10 px-4 py-2 rounded-2xl border border-violet-400/20 active:scale-95 transition-transform">
+                <button onClick={addItem} className="flex items-center text-xs font-black text-violet-600 dark:text-violet-400 bg-violet-600/10 px-4 py-2 rounded-2xl border border-violet-600/20 active:scale-95 transition-transform">
                   <PlusIcon className="w-4 h-4 mr-1.5" /> Manual
                 </button>
               </div>
 
-              {/* Global Gem Search */}
               <div className="relative">
                 <div className="relative group">
-                  <input 
-                    type="text" 
-                    value={itemSearchTerm} 
-                    onChange={(e) => setItemSearchTerm(e.target.value)} 
-                    placeholder="Search master gem catalog..." 
-                    className="w-full pl-11 pr-4 py-4 bg-slate-950/50 border border-slate-800 rounded-2xl focus:ring-2 focus:ring-violet-500 outline-none text-sm text-white shadow-inner"
-                  />
-                  <MagnifyingGlassIcon className="w-5 h-5 absolute left-4 top-4 text-slate-600 group-focus-within:text-violet-400 transition-colors" />
+                  <input type="text" value={itemSearchTerm} onChange={(e) => setItemSearchTerm(e.target.value)} placeholder="Search master gem catalog..." className="w-full pl-11 pr-4 py-4 bg-white dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800 rounded-2xl focus:ring-2 focus:ring-violet-500 outline-none text-sm shadow-sm" />
+                  <MagnifyingGlassIcon className="w-5 h-5 absolute left-4 top-4 text-slate-400 group-focus-within:text-violet-600 transition-colors" />
                 </div>
                 
                 {suggestedProducts.length > 0 && (
-                  <div className="absolute z-20 top-full left-0 right-0 mt-2 bg-slate-800 rounded-2xl shadow-2xl border border-slate-700 overflow-hidden max-h-60 overflow-y-auto ring-1 ring-slate-700">
-                    <div className="px-4 py-3 bg-slate-900 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] border-b border-slate-800">Celestial Catalog</div>
+                  <div className="absolute z-20 top-full left-0 right-0 mt-2 bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden max-h-60 overflow-y-auto">
                     {suggestedProducts.map((p) => (
-                      <button 
-                        key={p.particulars} 
-                        onClick={() => addFromRegistry(p)}
-                        className="w-full flex justify-between items-center p-5 text-left hover:bg-slate-700 border-b border-slate-900/50 last:border-0 active:bg-violet-600/20"
-                      >
+                      <button key={p.particulars} onClick={() => addFromRegistry(p)} className="w-full flex justify-between items-center p-5 text-left hover:bg-slate-50 dark:hover:bg-slate-700 border-b border-slate-100 dark:border-slate-900/50 last:border-0">
                         <div className="flex items-center">
-                          <div className="bg-slate-900 p-2 rounded-xl mr-4 text-violet-400">
+                          <div className="bg-slate-100 dark:bg-slate-900 p-2 rounded-xl mr-4 text-violet-600 dark:text-violet-400">
                             <StarIcon className="w-5 h-5" />
                           </div>
                           <div>
-                            <p className="font-bold text-sm text-white">{p.particulars}</p>
+                            <p className="font-bold text-sm text-slate-900 dark:text-white">{p.particulars}</p>
                             <p className="text-[10px] text-slate-500 uppercase font-bold tracking-widest mt-0.5">{p.weight} {p.weightUnit} • Std. Price</p>
                           </div>
                         </div>
-                        <p className="font-black text-violet-400 text-sm">{formatINR(p.unitPrice)}</p>
+                        <p className="font-black text-violet-600 dark:text-violet-400 text-sm">{formatINR(p.unitPrice)}</p>
                       </button>
                     ))}
                   </div>
@@ -570,18 +567,17 @@ const App: React.FC = () => {
               </div>
 
               {items.length === 0 ? (
-                <div className="text-center py-16 bg-slate-950/30 rounded-[2.5rem] border-2 border-dashed border-slate-800 text-slate-500">
+                <div className="text-center py-16 bg-white dark:bg-slate-950/30 rounded-[2.5rem] border-2 border-dashed border-slate-200 dark:border-slate-800 text-slate-400 dark:text-slate-500">
                   <ShoppingBagIcon className="w-12 h-12 mx-auto mb-4 opacity-20" />
                   <p className="text-sm font-bold opacity-60">Your bill is empty</p>
-                  <p className="text-xs opacity-40 mt-1">Search gems or add manually</p>
                 </div>
               ) : (
                 <div className="space-y-4 pb-6">
                   {items.map((item) => (
-                    <div key={item.id} className="bg-slate-950/50 p-5 rounded-3xl border border-slate-800 shadow-xl space-y-4 relative group hover:border-slate-700 transition-all">
+                    <div key={item.id} className="bg-white dark:bg-slate-950/50 p-5 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm dark:shadow-xl space-y-4">
                       <div className="flex justify-between items-start">
-                        <input type="text" value={item.particulars} onChange={(e) => updateItem(item.id, { particulars: e.target.value })} placeholder="Particulars" className="flex-1 bg-transparent border-none text-white font-bold focus:ring-0 p-0 text-base brand-font" />
-                        <button onClick={() => setItems(items.filter(i => i.id !== item.id))} className="text-slate-700 hover:text-rose-500 transition-colors">
+                        <input type="text" value={item.particulars} onChange={(e) => updateItem(item.id, { particulars: e.target.value })} placeholder="Particulars" className="flex-1 bg-transparent border-none text-slate-900 dark:text-white font-bold focus:ring-0 p-0 text-base brand-font" />
+                        <button onClick={() => setItems(items.filter(i => i.id !== item.id))} className="text-slate-400 hover:text-rose-500">
                           <TrashIcon className="w-5 h-5" />
                         </button>
                       </div>
@@ -589,17 +585,17 @@ const App: React.FC = () => {
                         <div className="space-y-1">
                           <label className="block text-[10px] text-slate-500 font-black uppercase tracking-widest ml-1">Weight</label>
                           <div className="relative">
-                             <input type="number" step="0.01" value={item.weight === 0 ? '' : item.weight} onChange={(e) => updateItem(item.id, { weight: parseFloat(e.target.value) || 0 })} className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white font-bold" />
-                             <span className="absolute right-2 top-2 text-[10px] font-bold text-violet-400 uppercase">{item.weightUnit}</span>
+                             <input type="number" step="0.01" value={item.weight === 0 ? '' : item.weight} onChange={(e) => updateItem(item.id, { weight: parseFloat(e.target.value) || 0 })} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-sm" />
+                             <span className="absolute right-2 top-2 text-[10px] font-bold text-violet-600 dark:text-violet-400 uppercase">{item.weightUnit}</span>
                           </div>
                         </div>
                         <div className="space-y-1">
                           <label className="block text-[10px] text-slate-500 font-black uppercase tracking-widest ml-1">Unit Price</label>
-                          <input type="number" value={item.unitPrice === 0 ? '' : item.unitPrice} onChange={(e) => updateItem(item.id, { unitPrice: parseFloat(e.target.value) || 0 })} className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-sm font-black text-violet-400" />
+                          <input type="number" value={item.unitPrice === 0 ? '' : item.unitPrice} onChange={(e) => updateItem(item.id, { unitPrice: parseFloat(e.target.value) || 0 })} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-sm font-black text-violet-600 dark:text-violet-400" />
                         </div>
                         <div className="space-y-1 text-right">
                           <label className="block text-[10px] text-slate-500 font-black uppercase tracking-widest mr-1">Subtotal</label>
-                          <div className="py-2 font-black text-white text-sm">{formatINR(item.total)}</div>
+                          <div className="py-2 font-black text-slate-900 dark:text-white text-sm">{formatINR(item.total)}</div>
                         </div>
                       </div>
                     </div>
@@ -612,11 +608,11 @@ const App: React.FC = () => {
 
         {step === 3 && (
           <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300 pb-12">
-            <section className="no-print bg-slate-950/50 p-6 rounded-3xl border border-slate-800 shadow-xl">
-              <h3 className="text-sm font-bold text-white flex items-center mb-5 brand-font"><PencilIcon className="w-5 h-5 mr-3 text-violet-400" /> Authorized Seal</h3>
-              <div className="relative border-2 border-dashed border-slate-800 rounded-3xl bg-slate-900 h-32 overflow-hidden shadow-inner">
+            <section className="no-print bg-white dark:bg-slate-950/50 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm dark:shadow-xl">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center mb-5 brand-font"><PencilIcon className="w-5 h-5 mr-3 text-violet-600 dark:text-violet-400" /> Authorized Seal</h3>
+              <div className="relative border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl bg-slate-50 dark:bg-slate-900 h-32 overflow-hidden shadow-inner">
                 <canvas ref={canvasRef} width={400} height={128} className="w-full h-full touch-none" onMouseDown={startDrawing} onMouseMove={draw} onMouseUp={stopDrawing} onMouseLeave={stopDrawing} onTouchStart={startDrawing} onTouchMove={draw} onTouchEnd={stopDrawing} />
-                {!signature && <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-20 text-[10px] font-black uppercase tracking-[0.4em] text-violet-400">Sign Below</div>}
+                {!signature && <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-20 text-[10px] font-black uppercase tracking-[0.4em] text-violet-600 dark:text-violet-400">Sign Below</div>}
               </div>
             </section>
 
@@ -699,36 +695,22 @@ const App: React.FC = () => {
               <button onClick={handleShare} className="w-full bg-slate-800 text-violet-400 py-5 rounded-[2rem] font-black text-sm uppercase tracking-[0.2em] border border-violet-500/20 active:scale-95 transition-all flex items-center justify-center">
                  <ShareIcon className="w-5 h-5 mr-3" /> Share to WhatsApp
               </button>
-              <button onClick={handleNewSession} className="w-full bg-slate-900 text-slate-500 py-4 rounded-[2rem] font-bold text-xs uppercase tracking-widest transition-colors hover:text-violet-400">Start New Session</button>
+              <button onClick={handleNewSession} className="w-full bg-white dark:bg-slate-900 text-slate-500 py-4 rounded-[2rem] font-bold text-xs uppercase tracking-widest border border-slate-200 dark:border-slate-800 transition-colors hover:text-violet-600 dark:hover:text-violet-400">Start New Session</button>
             </div>
-          </div>
-        )}
-
-        {showIosInstallTip && (
-          <div className="fixed bottom-28 left-4 right-4 z-[100] animate-in slide-in-from-bottom-10 duration-500 no-print">
-            <div className="bg-violet-600 p-5 rounded-[2.5rem] shadow-[0_20px_50px_rgba(124,58,237,0.5)] border border-violet-400/30 flex items-start text-white">
-              <div className="bg-white p-3 rounded-2xl mr-4 text-violet-600 shadow-xl"><SquaresPlusIcon className="w-6 h-6" /></div>
-              <div className="flex-1 pr-4">
-                <h4 className="text-sm font-black brand-font tracking-tight">Celestial Experience</h4>
-                <p className="text-xs text-violet-100 mt-1 leading-tight">Tap <ArrowUpOnSquareIcon className="w-4 h-4 inline" /> and 'Add to Home Screen' for the dedicated app experience.</p>
-              </div>
-              <button onClick={dismissIosTip} className="text-white/60 hover:text-white transition-colors"><XMarkIcon className="w-6 h-6" /></button>
-            </div>
-            <div className="absolute left-1/2 -translate-x-1/2 -bottom-2 w-4 h-4 bg-violet-600 rotate-45 shadow-lg"></div>
           </div>
         )}
       </main>
 
-      <footer className="flex-none bg-slate-950 p-5 border-t border-slate-800 shadow-inner no-print pb-[env(safe-area-inset-bottom,20px)]">
+      <footer className="flex-none bg-white dark:bg-slate-950 p-5 border-t border-slate-200 dark:border-slate-800 shadow-inner no-print pb-[env(safe-area-inset-bottom,20px)] transition-colors duration-300">
         <div className="flex gap-4">
           {step > 1 && (
-            <button onClick={() => setStep(prev => (prev - 1) as any)} className="flex-1 bg-slate-900 text-slate-400 py-4 rounded-2xl font-black text-xs uppercase tracking-widest border border-slate-800 active:scale-95 transition-transform">Back</button>
+            <button onClick={() => setStep(prev => (prev - 1) as any)} className="flex-1 bg-slate-100 dark:bg-slate-900 text-slate-500 dark:text-slate-400 py-4 rounded-2xl font-black text-xs uppercase tracking-widest border border-slate-200 dark:border-slate-800 active:scale-95 transition-transform">Back</button>
           )}
           {step < 3 && (
             <button 
               onClick={() => step === 1 ? setStep(2) : handleFinish()}
               disabled={step === 2 && items.length === 0}
-              className={`flex-[2] py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl transition-all active:scale-95 ${step === 2 && items.length === 0 ? 'bg-slate-800 text-slate-600' : 'bg-violet-600 text-white shadow-violet-900/30'}`}
+              className={`flex-[2] py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl transition-all active:scale-95 ${step === 2 && items.length === 0 ? 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-600' : 'bg-violet-600 text-white shadow-violet-900/30'}`}
             >
               {step === 1 ? 'Go to Inventory' : 'Finalize & Preview'}
             </button>
